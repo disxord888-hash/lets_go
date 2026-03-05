@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Symbol Rhythm Composer</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Outfit:wght@300;600&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <div class="background-blobs">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <main class="container">
+        <header>
+            <h1>Symbol Rhythm Composer</h1>
+            <p class="subtitle">記号でリズムを刻む次世代シーケンサー</p>
+        </header>
+
+        <section class="controls glass">
+            <div class="control-group">
+                <label for="bpm">BPM</label>
+                <input type="number" id="bpm" value="120" min="40" max="240">
+                <input type="range" id="bpm-range" min="40" max="240" value="120">
+            </div>
+
+            <div class="button-group">
+                <button id="play-btn" class="primary-btn">再生</button>
+                <button id="stop-btn" class="secondary-btn">停止</button>
+            </div>
+        </section>
+
+        <section class="editor glass">
+            <div class="symbols-guide">
+                <div class="guide-item" title="1/8 音"><span>.</span> 1/8</div>
+                <div class="guide-item" title="1/4 音"><span>:</span> 1/4</div>
+                <div class="guide-item" title="1/2 音"><span>|</span> 1/2</div>
+                <div class="guide-item" title="1拍 音"><span>-</span> 1</div>
+                <div class="guide-item" title="2拍 音"><span>=</span> 2</div>
+                <div class="guide-item" title="4拍 音"><span>*</span> 4</div>
+                <div class="guide-item" title="1.5倍"><span>/</span> 付点</div>
+                <div class="guide-item" title="1/8 休"><span>!</span> 1/8</div>
+                <div class="guide-item" title="1/4 休"><span>"</span> 1/4</div>
+                <div class="guide-item" title="1/2 休"><span>#</span> 1/2</div>
+                <div class="guide-item" title="1拍 休"><span>@</span> 1</div>
+            </div>
+            <textarea id="rhythm-input" placeholder="入力例:
+(C5) - -
+(G4) ::::"> (C5) - -
+(G4) :::: </textarea>
+            <div class="tag-note">
+                <p>※ <code>改行</code>で同時再生（マルチトラック）が可能です。再生は1回のみ行われます。</p>
+            </div>
+            <div id="visualizer" class="visualizer"></div>
+        </section>
+
+        <footer>
+            <p>&copy; 2026 Symbol Rhythm Composer. Created by Antigravity.</p>
+        </footer>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
