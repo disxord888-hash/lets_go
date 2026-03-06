@@ -41,6 +41,7 @@ function noteToFreq(noteStr) {
 
 const playBtn = document.getElementById('play-btn');
 const stopBtn = document.getElementById('stop-btn');
+const exportBtn = document.getElementById('export-btn');
 const bpmInput = document.getElementById('bpm');
 const bpmRange = document.getElementById('bpm-range');
 const rhythmInput = document.getElementById('rhythm-input');
@@ -68,12 +69,12 @@ bpmRange.addEventListener('input', (e) => {
     bpmInput.value = e.target.value;
 });
 
-function playSound(time, frequency) {
+function playSound(ctx, time, frequency) {
     const now = time;
     const duration = 2.0;
 
-    const masterGain = audioCtx.createGain();
-    masterGain.connect(audioCtx.destination);
+    const masterGain = ctx.createGain();
+    masterGain.connect(ctx.destination);
 
     masterGain.gain.setValueAtTime(0, now);
     masterGain.gain.linearRampToValueAtTime(0.4, now + 0.005);
@@ -88,8 +89,8 @@ function playSound(time, frequency) {
     ];
 
     harmonics.forEach(h => {
-        const osc = audioCtx.createOscillator();
-        const g = audioCtx.createGain();
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
 
         osc.type = 'sine';
         osc.frequency.setValueAtTime(frequency * h.ratio, now);
@@ -104,16 +105,18 @@ function playSound(time, frequency) {
         osc.stop(now + duration);
     });
 
-    // Visual feedback
-    const barIndex = Math.floor(Math.random() * bars.length);
-    setTimeout(() => {
-        bars[barIndex].classList.add('active');
-        bars[barIndex].style.height = '100%';
+    // Visual feedback (only for real-time play)
+    if (ctx instanceof (window.AudioContext || window.webkitAudioContext)) {
+        const barIndex = Math.floor(Math.random() * bars.length);
         setTimeout(() => {
-            bars[barIndex].classList.remove('active');
-            bars[barIndex].style.height = '10%';
-        }, 100);
-    }, (time - audioCtx.currentTime) * 1000);
+            bars[barIndex].classList.add('active');
+            bars[barIndex].style.height = '100%';
+            setTimeout(() => {
+                bars[barIndex].classList.remove('active');
+                bars[barIndex].style.height = '10%';
+            }, 100);
+        }, (time - ctx.currentTime) * 1000);
+    }
 }
 
 function parseInput(inputText) {
@@ -184,7 +187,7 @@ function scheduler() {
             const event = track.events[state.eventIndex];
 
             if (event.type === 'note') {
-                playSound(state.nextNoteTime, event.frequency);
+                playSound(audioCtx, state.nextNoteTime, event.frequency);
             }
 
             state.nextNoteTime += event.duration * secondsPerBeat;
@@ -235,3 +238,123 @@ function stopPlayback() {
 
 playBtn.addEventListener('click', startPlayback);
 stopBtn.addEventListener('click', stopPlayback);
+
+/**
+ * AudioBufferをWAV形式のBlobに変換する
+ */
+function bufferToWav(buffer) {
+    const numOfChan = buffer.numberOfChannels;
+    const length = buffer.length * numOfChan * 2 + 44;
+    const bufferArray = new ArrayBuffer(length);
+    const view = new DataView(bufferArray);
+    const channels = [];
+    let i, sample, offset = 0, pos = 0;
+
+    function setUint16(data) {
+        view.setUint16(pos, data, true);
+        pos += 2;
+    }
+
+    function setUint32(data) {
+        view.setUint32(pos, data, true);
+        pos += 4;
+    }
+
+    // RIFF header
+    setUint32(0x46464952);                         // "RIFF"
+    setUint32(length - 8);                         // file length - 8
+    setUint32(0x45564157);                         // "WAVE"
+
+    // fmt chunk
+    setUint32(0x20746d66);                         // "fmt " chunk
+    setUint32(16);                                 // length = 16
+    setUint16(1);                                  // PCM (uncompressed)
+    setUint16(numOfChan);
+    setUint32(buffer.sampleRate);
+    setUint32(buffer.sampleRate * 2 * numOfChan);  // avg. bytes/sec
+    setUint16(numOfChan * 2);                      // block-align
+    setUint16(16);                                 // 16-bit
+
+    // data chunk
+    setUint32(0x61746164);                         // "data" - chunk
+    setUint32(length - pos - 4);                   // chunk length
+
+    for (i = 0; i < buffer.numberOfChannels; i++) {
+        channels.push(buffer.getChannelData(i));
+    }
+
+    while (pos < length) {
+        for (i = 0; i < numOfChan; i++) {
+            sample = Math.max(-1, Math.min(1, channels[i][offset]));
+            sample = (sample < 0 ? sample * 0x8000 : sample * 0x7FFF);
+            view.setInt16(pos, sample, true);
+            pos += 2;
+        }
+        offset++;
+    }
+
+    return new Blob([bufferArray], { type: "audio/wav" });
+}
+
+async function exportAudio() {
+    const tracks = parseInput(rhythmInput.value);
+    if (tracks.length === 0) return;
+
+    exportBtn.disabled = true;
+    exportBtn.textContent = '書き出し中...';
+
+    const bpm = parseFloat(bpmInput.value);
+    const secondsPerBeat = 60.0 / bpm;
+
+    // 全体の長さを計算
+    let maxDuration = 0;
+    tracks.forEach(track => {
+        let duration = 0;
+        track.events.forEach(event => {
+            duration += event.duration * secondsPerBeat;
+        });
+        if (duration > maxDuration) maxDuration = duration;
+    });
+
+    // 最後の余韻を追加
+    maxDuration += 2.5;
+
+    const offlineCtx = new OfflineAudioContext(2, Math.ceil(44100 * maxDuration), 44100);
+
+    // 全てのトラックをスケジュール
+    tracks.forEach(track => {
+        let nextNoteTime = 0;
+        track.events.forEach(event => {
+            if (event.type === 'note') {
+                playSound(offlineCtx, nextNoteTime, event.frequency);
+            }
+            nextNoteTime += event.duration * secondsPerBeat;
+        });
+    });
+
+    try {
+        const renderedBuffer = await offlineCtx.startRendering();
+        const wavBlob = bufferToWav(renderedBuffer);
+        const url = URL.createObjectURL(wavBlob);
+
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `rhythm_export_${new Date().getTime()}.wav`;
+        document.body.appendChild(a);
+        a.click();
+
+        setTimeout(() => {
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }, 100);
+    } catch (e) {
+        console.error('Export failed:', e);
+        alert('書き出しに失敗しました。');
+    } finally {
+        exportBtn.disabled = false;
+        exportBtn.textContent = 'WAV書き出し';
+    }
+}
+
+exportBtn.addEventListener('click', exportAudio);

@@ -193,6 +193,27 @@ button {
     transform: translateY(-2px);
 }
 
+.export-btn {
+    background: var(--accent-color);
+    color: white;
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+}
+
+.export-btn:hover {
+    background: #059669;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.6);
+}
+
+.export-btn:disabled {
+    background: var(--secondary-color);
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+
 .editor {
     display: flex;
     flex-direction: column;
